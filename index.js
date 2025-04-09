@@ -1,16 +1,19 @@
+import dotenv from "dotenv";
 import express from "express";
 import bodyParser from "body-parser";
 import pg from "pg";
 
+dotenv.config();
+
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 const db = new pg.Client({
-  user: "postgres",
-  host: "localhost",
-  database: "world",
-  password: "123456",
-  port: 5432,
+  user: process.env.PG_USER,
+  host: process.env.PG_HOST,
+  database: process.env.PG_DB,
+  password: process.env.PG_PASSWORD,
+  port: process.env.PG_PORT,
 });
 db.connect();
 
@@ -46,12 +49,11 @@ app.get("/", async (req, res) => {
     users: users,
     color: "teal",
   });
-
 });
 
 app.post("/add", async (req, res) => {
   const input = req.body["country"];
-  var id;
+  let id;
   for (let i = 0; i < users.length; i++) {
     if (users[i].color === col) {
       id = users[i].id;
@@ -65,6 +67,7 @@ app.post("/add", async (req, res) => {
     );
     const data = result.rows[0];
     const countryCode = data.country_code;
+
     try {
       await db.query(
         "INSERT INTO visited_countries (country_code, user_id) VALUES ($1, $2)",
@@ -87,7 +90,7 @@ app.post("/add", async (req, res) => {
         total: countries.length,
         users: users,
         color: col,
-        error: "Country has already been added, try again."
+        error: "Country has already been added, try again.",
       });
     }
   } catch (err) {
@@ -99,7 +102,7 @@ app.post("/add", async (req, res) => {
       total: countries.length,
       users: users,
       color: col,
-      error: "Country name does not exist, try again."
+      error: "Country name does not exist, try again.",
     });
   }
 });
@@ -108,43 +111,39 @@ app.post("/user", async (req, res) => {
   const input = parseInt(req.body["user"]);
 
   try {
-    const result = await db.query(
-    "SELECT country_code FROM visited_countries WHERE user_id=$1",
-    [input]
-  );
-  const countries = await checkVisisted(input);
-  const r = await db.query("SELECT * FROM users");
-  const c = r.rows
-  var country = [];
-  for (let i = 0; i < c.length; i++) {
-    if (c[i].id === input) {
-      country = c[i];
+    await db.query(
+      "SELECT country_code FROM visited_countries WHERE user_id=$1",
+      [input]
+    );
+    const countries = await checkVisisted(input);
+    const r = await db.query("SELECT * FROM users");
+    const c = r.rows;
+    let country = [];
+
+    for (let i = 0; i < c.length; i++) {
+      if (c[i].id === input) {
+        country = c[i];
+      }
     }
-  }
-  col = country.color
-  res.render("index.ejs", {
-    countries: countries,
-    total: countries.length,
-    users: users,
-    color: country.color,
-  });
+    col = country.color;
+
+    res.render("index.ejs", {
+      countries: countries,
+      total: countries.length,
+      users: users,
+      color: country.color,
+    });
   } catch {
     res.render("new.ejs");
   }
-  
 });
 
 app.post("/new", async (req, res) => {
-  //Hint: The RETURNING keyword can return the data that was inserted.
-  //https://www.postgresql.org/docs/current/dml-returning.html
   const name = req.body["name"];
   const color = req.body["color"];
 
   try {
-    await db.query(
-      "INSERT INTO users (name, color) VALUES ($1,$2)",
-      [name, color]
-    );
+    await db.query("INSERT INTO users (name, color) VALUES ($1,$2)", [name, color]);
     res.redirect("/");
   } catch (err) {
     console.log(err);
